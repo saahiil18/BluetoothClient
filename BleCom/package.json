@@ -10,9 +10,15 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "enzyme-adapter-react-16": "^1.15.2",
+    "jest-environment-enzyme": "^7.1.2",
+    "jest-enzyme": "^7.1.2",
     "react": "16.9.0",
     "react-native": "0.61.5",
-    "react-native-ble-manager": "^6.7.0"
+    "react-native-ble-manager": "^6.7.0",
+    "react-native-gesture-handler": "^1.5.3",
+    "react-navigation": "^4.0.10",
+    "react-navigation-stack": "^1.10.3"
   },
   "devDependencies": {
     "@babel/core": "^7.7.7",
