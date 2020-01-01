@@ -1,18 +1,21 @@
+/* eslint-disable prettier/prettier */
 /* eslint-disable react-native/no-inline-styles */
 import React, {Component} from 'react';
 import {
-  View,
+  AppRegistry,
   StyleSheet,
-  NativeModules,
+  Text,
+  View,
+  TouchableHighlight,
+  NativeAppEventEmitter,
   NativeEventEmitter,
-  AppState,
+  NativeModules,
   Platform,
   PermissionsAndroid,
-  Dimensions,
-  TouchableHighlight,
-  Text,
   ScrollView,
+  AppState,
   FlatList,
+  Dimensions,
 } from 'react-native';
 import BleManager from 'react-native-ble-manager';
 
@@ -20,11 +23,9 @@ const window = Dimensions.get('window');
 
 const BleManagerModule = NativeModules.BleManager;
 const bleManagerEmitter = new NativeEventEmitter(BleManagerModule);
-
 const service = '49535343-fe7d-4ae5-8fa9-9fafd205e455';
-const bakeCharacteristic = '49535343-1e4d-4bd9-ba61-23c647249616';
-
-export default class Bluetooth extends React.Component {
+const rwn_characteristic = '49535343-1e4d-4bd9-ba61-23c647249616';
+export default class Bluetooth extends Component {
   constructor() {
     super();
 
@@ -74,7 +75,7 @@ export default class Bluetooth extends React.Component {
         if (result) {
           console.log('Permission is OK');
         } else {
-          PermissionsAndroid.request(
+          PermissionsAndroid.requestPermission(
             PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
           ).then(permission_result => {
             if (permission_result) {
@@ -120,23 +121,10 @@ export default class Bluetooth extends React.Component {
   }
 
   handleUpdateValueForCharacteristic(data) {
-    console.log(
-      'Received data from ' +
-        data.peripheral +
-        ' characteristic ' +
-        data.characteristic,
-      data.value,
-    );
-    if (data.value) {
-      BleManager.write(data.peripheral, service, bakeCharacteristic, [
-        166,
-        2,
-        208,
-        1,
-      ]).then(() => {
-        console.log('Write 1');
-      });
-    }
+    console.log('Received data from ' + data.peripheral + ' characteristic ' + data.characteristic, data.value);
+    let receivedBytes = [];
+    receivedBytes.push(data.value);
+    console.log('Received Bytes: ' + receivedBytes);
   }
 
   handleStopScan() {
@@ -147,7 +135,8 @@ export default class Bluetooth extends React.Component {
   startScan() {
     if (!this.state.scanning) {
       //this.setState({peripherals: new Map()});
-      BleManager.scan([], 10, true).then(results => {
+
+      BleManager.scan([], 6, true).then(results => {
         console.log('Scanning...');
         this.setState({scanning: true});
       });
@@ -180,7 +169,7 @@ export default class Bluetooth extends React.Component {
     this.setState({peripherals});
   }
 
-  test(peripheral, data) {
+  test(peripheral) {
     if (peripheral) {
       if (peripheral.connected) {
         BleManager.disconnect(peripheral.id);
@@ -204,7 +193,7 @@ export default class Bluetooth extends React.Component {
                     BleManager.startNotification(
                       peripheral.id,
                       service,
-                      bakeCharacteristic,
+                      rwn_characteristic,
                     )
                       .then(() => {
                         console.log('Started notification on ' + peripheral.id);
@@ -288,7 +277,7 @@ export default class Bluetooth extends React.Component {
           <Text>Retrieve connected peripherals</Text>
         </TouchableHighlight>
         <ScrollView style={styles.scroll}>
-          {list.length === 0 && (
+          {list.length == 0 && (
             <View style={{flex: 1, margin: 20}}>
               <Text style={{textAlign: 'center'}}>No peripherals</Text>
             </View>
