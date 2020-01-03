@@ -1,30 +1,40 @@
+/* eslint-disable no-control-regex */
+/* eslint-disable no-bitwise */
 /* eslint-disable prettier/prettier */
-/* eslint-disable react-native/no-inline-styles */
 import React, {Component} from 'react';
 import {
-  AppRegistry,
   StyleSheet,
   Text,
   View,
-  TouchableHighlight,
-  NativeAppEventEmitter,
   NativeEventEmitter,
   NativeModules,
   Platform,
   PermissionsAndroid,
-  ScrollView,
   AppState,
   FlatList,
-  Dimensions,
+  Button,
 } from 'react-native';
 import BleManager from 'react-native-ble-manager';
 
-const window = Dimensions.get('window');
 
 const BleManagerModule = NativeModules.BleManager;
 const bleManagerEmitter = new NativeEventEmitter(BleManagerModule);
 const service = '49535343-fe7d-4ae5-8fa9-9fafd205e455';
 const rwn_characteristic = '49535343-1e4d-4bd9-ba61-23c647249616';
+
+const machineEvents = new Map();
+const eventString = [
+  {
+    key: 'A5',
+    funcSubCode: 'D0',
+  },
+];
+
+for (let i = 0; i < eventString.length; i++) {
+  machineEvents.set(eventString[i].key, eventString[i]);
+}
+
+
 export default class Bluetooth extends Component {
   constructor() {
     super();
@@ -89,6 +99,10 @@ export default class Bluetooth extends Component {
     }
   }
 
+  responseToServer() {
+    console.log('I have been Called By The Map');
+  }
+
   handleAppStateChange(nextAppState) {
     if (
       this.state.appState.match(/inactive|background/) &&
@@ -109,23 +123,48 @@ export default class Bluetooth extends Component {
     this.handlerUpdate.remove();
   }
 
-  handleDisconnectedPeripheral(data) {
+  handleDisconnectedPeripheral() {
     let peripherals = this.state.peripherals;
-    let peripheral = peripherals.get(data.peripheral);
+    let peripheral = peripherals.get('94:65:9C:87:69:E0');
     if (peripheral) {
       peripheral.connected = false;
-      peripherals.set(peripheral.id, peripheral);
+      peripherals.set('94:65:9C:87:69:E0', peripheral);
       this.setState({peripherals});
     }
-    console.log('Disconnected from ' + data.peripheral);
+    console.log('Disconnected from ' + '94:65:9C:87:69:E0');
+  }
+
+  hexToAscii(str1) {
+    const hex = str1.toString();
+    let str = '';
+    for (let n = 0; n < hex.length; n += 2) {
+      str += String.fromCharCode(parseInt(hex.substr(n, 2), 16));
+    }
+    return str;
   }
 
   handleUpdateValueForCharacteristic(data) {
-    console.log('Received data from ' + data.peripheral + ' characteristic ' + data.characteristic, data.value);
-    let receivedBytes = [];
-    receivedBytes.push(data.value);
-    console.log('Received Bytes: ' + receivedBytes);
+    console.log('Received data from ' + '94:65:9C:87:69:E0' + ' characteristic ' + data.characteristic, data.value);
+    let arrayBuff = [];
+    this.hexdump(data.value, 16);
+    arrayBuff.push(this.hexToAscii(data.value));
+    console.log('Array: ' + arrayBuff);
+
   }
+
+  writeToServer(data) {
+    console.log('I have Received the Array Buffer' + data);
+
+  }
+
+  startCommunication() {
+    const vendekinResponse = [ 166 , 2, 208, 1 ];
+    BleManager.write('94:65:9C:87:69:E0', service, rwn_characteristic, vendekinResponse ).then(() => {
+      console.log('Write Was Success');
+    });
+  }
+
+
 
   handleStopScan() {
     console.log('Scan is stopped');
@@ -136,7 +175,7 @@ export default class Bluetooth extends Component {
     if (!this.state.scanning) {
       //this.setState({peripherals: new Map()});
 
-      BleManager.scan([], 6, true).then(results => {
+      BleManager.scan([], 3, true).then(() => {
         console.log('Scanning...');
         this.setState({scanning: true});
       });
@@ -153,7 +192,7 @@ export default class Bluetooth extends Component {
       for (var i = 0; i < results.length; i++) {
         var peripheral = results[i];
         peripheral.connected = true;
-        peripherals.set(peripheral.id, peripheral);
+        peripherals.set('94:65:9C:87:69:E0', peripheral);
         this.setState({peripherals});
       }
     });
@@ -165,38 +204,83 @@ export default class Bluetooth extends Component {
     if (!peripheral.name) {
       peripheral.name = 'NO NAME';
     }
-    peripherals.set(peripheral.id, peripheral);
+    peripherals.set('94:65:9C:87:69:E0', peripheral);
     this.setState({peripherals});
+  }
+
+  hexdump(buffer, blockSize) {
+
+    if (typeof buffer === 'string'){
+      console.log('buffer is string');
+      //do nothing
+    } else if (buffer instanceof ArrayBuffer && buffer.byteLength !== undefined){
+      console.log('buffer is ArrayBuffer');
+      buffer = String.fromCharCode.apply(String, [].slice.call(new Uint8Array(buffer)));
+    } else if (Array.isArray(buffer)){
+      buffer = String.fromCharCode.apply(String, buffer);
+    } else if (buffer.constructor === Uint8Array) {
+      console.log('buffer is Uint8Array');
+      buffer = String.fromCharCode.apply(String, [].slice.call(buffer));
+    } else {
+      console.log('Error: buffer is unknown...');
+      return false;
+    }
+
+
+    blockSize = blockSize || 16;
+      var lines = [];
+      var byteCode = [];
+      var hex = '0123456789ABCDEF';
+      for (var b = 0; b < buffer.length; b += blockSize) {
+          var block = buffer.slice(b, Math.min(b + blockSize, buffer.length));
+          var addr = ('0000' + b.toString(16)).slice(-4);
+          var codes = block.split('').map(function (ch) {
+              var code = ch.charCodeAt(0);
+              return ' ' + hex[(0xF0 & code) >> 4] + hex[0x0F & code];
+          }).join('');
+          codes += '   '.repeat(blockSize - block.length);
+          var chars = block.replace(/[\x00-\x1F\x20]/g, '.');
+          chars +=  ' '.repeat(blockSize - block.length);
+          lines.push(addr + ' ' + codes + '  ' + chars);
+          byteCode.push(codes);
+        }
+      console.log(lines.join('\n'));
+      return byteCode;
   }
 
   test(peripheral) {
     if (peripheral) {
       if (peripheral.connected) {
-        BleManager.disconnect(peripheral.id);
+        BleManager.stopNotification(
+          '94:65:9C:87:69:E0',
+          service,
+          rwn_characteristic,
+        );
+        BleManager.disconnect('94:65:9C:87:69:E0');
       } else {
-        BleManager.connect(peripheral.id)
+        BleManager.connect('94:65:9C:87:69:E0')
           .then(() => {
             let peripherals = this.state.peripherals;
-            let p = peripherals.get(peripheral.id);
+            let p = peripherals.get('94:65:9C:87:69:E0');
             if (p) {
               p.connected = true;
-              peripherals.set(peripheral.id, p);
+              peripherals.set('94:65:9C:87:69:E0', p);
               this.setState({peripherals});
             }
-            console.log('Connected to ' + peripheral.id);
+            console.log('Connected to ' + '94:65:9C:87:69:E0');
 
             setTimeout(() => {
-              BleManager.retrieveServices(peripheral.id).then(
+              BleManager.retrieveServices('94:65:9C:87:69:E0').then(
                 peripheralInfo => {
                   console.log(peripheralInfo);
                   setTimeout(() => {
                     BleManager.startNotification(
-                      peripheral.id,
+                      '94:65:9C:87:69:E0',
                       service,
                       rwn_characteristic,
                     )
                       .then(() => {
-                        console.log('Started notification on ' + peripheral.id);
+                        console.log('Started notification on ' + '94:65:9C:87:69:E0');
                       })
                       .catch(error => {
                         console.log('Notification error', error);
@@ -214,40 +298,11 @@ export default class Bluetooth extends Component {
   }
 
   renderItem(item) {
-    const color = item.connected ? 'green' : '#fff';
+    const buttonTitle = item.connected ? 'Disconnect' : 'Connect';
     return (
-      <TouchableHighlight onPress={() => this.test(item)}>
-        <View style={[styles.row, {backgroundColor: color}]}>
-          <Text
-            style={{
-              fontSize: 12,
-              textAlign: 'center',
-              color: '#333333',
-              padding: 10,
-            }}>
-            {item.name}
-          </Text>
-          <Text
-            style={{
-              fontSize: 10,
-              textAlign: 'center',
-              color: '#333333',
-              padding: 2,
-            }}>
-            RSSI: {item.rssi}
-          </Text>
-          <Text
-            style={{
-              fontSize: 8,
-              textAlign: 'center',
-              color: '#333333',
-              padding: 2,
-              paddingBottom: 20,
-            }}>
-            {item.id}
-          </Text>
-        </View>
-      </TouchableHighlight>
+      <View style={[styles.buttonContainer]}>
+      <Button title={buttonTitle} onPress={() => this.test(item)} />
+      </View>
     );
   }
 
@@ -255,57 +310,43 @@ export default class Bluetooth extends Component {
     const list = Array.from(this.state.peripherals.values());
 
     return (
-      <View style={styles.container}>
-        <TouchableHighlight
-          style={{
-            marginTop: 40,
-            margin: 20,
-            padding: 20,
-            backgroundColor: '#ccc',
-          }}
-          onPress={() => this.startScan()}>
+      <View style={styles.peripheralContainer}>
+        <Button
+          onPress={() => this.startScan()}
+          title="Scan For Devices">
           <Text>Scan Bluetooth ({this.state.scanning ? 'on' : 'off'})</Text>
-        </TouchableHighlight>
-        <TouchableHighlight
-          style={{
-            marginTop: 0,
-            margin: 20,
-            padding: 20,
-            backgroundColor: '#ccc',
-          }}
-          onPress={() => this.retrieveConnected()}>
-          <Text>Retrieve connected peripherals</Text>
-        </TouchableHighlight>
-        <ScrollView style={styles.scroll}>
-          {list.length == 0 && (
-            <View style={{flex: 1, margin: 20}}>
-              <Text style={{textAlign: 'center'}}>No peripherals</Text>
-            </View>
-          )}
-          <FlatList
+        </Button>
+        <Button
+          onPress={() => this.retrieveConnected()}
+          title="Get Connected Peripherals" />
+        <View style={styles.scroll}>
+        <FlatList
             data={list}
             renderItem={({item}) => this.renderItem(item)}
             keyExtractor={item => item.id}
           />
-        </ScrollView>
+        </View>
       </View>
     );
   }
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFF',
-    width: window.width,
-    height: window.height,
-  },
   scroll: {
     flex: 1,
     backgroundColor: '#f0f0f0',
     margin: 10,
   },
+  peripheralContainer: {
+  flex: 1,
+  },
   row: {
     margin: 10,
+  },
+  buttonContainer: {
+    flex: 1,
+    alignContent: 'flex-end',
+    marginTop: 500,
+
   },
 });
