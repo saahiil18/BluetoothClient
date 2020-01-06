@@ -8,7 +8,6 @@ import {
   StyleSheet,
   Text,
   View,
-  Alert,
   NativeEventEmitter,
   NativeModules,
   Platform,
@@ -18,10 +17,10 @@ import {
   FlatList,
   TextInput,
   TouchableOpacity,
-  Button,
 } from 'react-native';
 import BleManager from 'react-native-ble-manager';
 import { ScrollView } from 'react-native-gesture-handler';
+import { Colors } from 'react-native/Libraries/NewAppScreen';
 
 
 const BleManagerModule = NativeModules.BleManager;
@@ -41,6 +40,7 @@ export default class Bluetooth extends Component {
       isConnected: false,
       bleData: '',
       receivedData: '',
+      dataOnScreen: [],
     };
 
     this.handleDiscoverPeripheral = this.handleDiscoverPeripheral.bind(this);
@@ -152,11 +152,13 @@ export default class Bluetooth extends Component {
 
   handleUpdateValueForCharacteristic(data) {
     console.log('Received data from ' + data.peripheral + ' characteristic ' + data.characteristic, data.value);
+    if (data.value) {
     this.hexdump(data.value, 16);
     var strValue  = (this.HexString(data.value));
     console.log('This is the Value: ' + strValue);
     this.setState({receivedData: strValue});
     return strValue;
+    }
 }
 
   HexString(byteArray) {
@@ -243,7 +245,10 @@ export default class Bluetooth extends Component {
           lines.push(addr + ' ' + codes + '  ' + chars);
           byteCode.push(codes);
         }
-      console.log(lines.join('\n'));
+      let messages = [];
+      messages.push(this.state.dataOnScreen);
+      messages.push(lines.join('\n').split(','));
+      this.setState({dataOnScreen: messages + '\n'});
       return byteCode;
   }
 
@@ -338,6 +343,7 @@ export default class Bluetooth extends Component {
 
   render() {
     const list = Array.from(this.state.peripherals.values());
+    let mac_address = dataSend.id;
     if (!this.state.isConnected) {
     return (
       <View style={styles.container}>
@@ -364,22 +370,29 @@ export default class Bluetooth extends Component {
     );
   } else {
     return (
-    <View style={styles.container2}>
-  <Text>Scan Bluetooth: {this.state.receivedData}</Text>
-      <TextInput style = {styles.input}
+    <View style={styles.container}>
+      <ScrollView style={styles.scroll}>
+        <View style={{flex: 1}}>
+        <Text style={{textAlign: 'center'}}>Connected to {mac_address}</Text>
+        <Text style={{textAlign: 'center'}}>{this.state.dataOnScreen}</Text>
+          </View>
+        </ScrollView>
+      <View style={styles.inputHandler}>
+        <TextInput style = {styles.input}
                underlineColorAndroid = "transparent"
                placeholder = "Data to Send ex.a60501"
                placeholderTextColor = "#9a73ef"
-               autoCapitalize = "none"
+               autoCapitalize = "characters"
                onChangeText = {this.handleData}/>
-      <TouchableOpacity
+        <TouchableOpacity
                style = {styles.submitButton}
                onPress = {
                   () => this.login(this.state.bleData)
                }>
           <Text style = {styles.submitButtonText}> Send </Text>
-      </TouchableOpacity>
-         </View>
+        </TouchableOpacity>
+      </View>
+    </View>
     );
   }
   }
@@ -396,16 +409,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f0f0f0',
     margin: 10,
+    marginBottom: 30,
   },
   row: {
     margin: 10,
   },
-  container2: {
+  inputHandler: {
     paddingTop: 23,
+    flex: 1,
+    position: 'absolute',
+    bottom: 0,
  },
  input: {
     margin: 15,
     height: 40,
+    width: 200,
     borderColor: '#7a42f4',
     borderWidth: 1,
  },
@@ -414,6 +432,8 @@ const styles = StyleSheet.create({
     padding: 10,
     margin: 15,
     height: 40,
+    width: 200,
+
  },
  submitButtonText:{
     color: 'white',
