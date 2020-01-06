@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Text,
   View,
+  Alert,
   NativeEventEmitter,
   NativeModules,
   Platform,
@@ -15,6 +16,8 @@ import {
   AppState,
   TouchableHighlight,
   FlatList,
+  TextInput,
+  TouchableOpacity,
   Button,
 } from 'react-native';
 import BleManager from 'react-native-ble-manager';
@@ -25,16 +28,19 @@ const BleManagerModule = NativeModules.BleManager;
 const bleManagerEmitter = new NativeEventEmitter(BleManagerModule);
 const service = '49535343-fe7d-4ae5-8fa9-9fafd205e455';
 const rwn_characteristic = '49535343-1e4d-4bd9-ba61-23c647249616';
-
+let dataSend = '';
 export default class Bluetooth extends Component {
   constructor() {
     super();
+
 
     this.state = {
       scanning: false,
       peripherals: new Map(),
       appState: '',
       isConnected: false,
+      bleData: '',
+      receivedData: '',
     };
 
     this.handleDiscoverPeripheral = this.handleDiscoverPeripheral.bind(this);
@@ -91,9 +97,6 @@ export default class Bluetooth extends Component {
     }
   }
 
-  responseToServer() {
-    console.log('I have been Called By The Map');
-  }
 
   handleAppStateChange(nextAppState) {
     if (
@@ -152,6 +155,7 @@ export default class Bluetooth extends Component {
     this.hexdump(data.value, 16);
     var strValue  = (this.HexString(data.value));
     console.log('This is the Value: ' + strValue);
+    this.setState({receivedData: strValue});
     return strValue;
 }
 
@@ -244,6 +248,7 @@ export default class Bluetooth extends Component {
   }
 
   test(peripheral) {
+    dataSend = peripheral;
     if (peripheral) {
       if (peripheral.connected) {
         BleManager.stopNotification(
@@ -293,21 +298,22 @@ export default class Bluetooth extends Component {
     }
   }
 
-  playWithData(strs, data) {
-    console.log('This is the Value: ' + strs);
-    if (strs.startsWith('a5') && strs.endsWith('00')) {
+  writeToApp(hexString) {
+    console.log('This is the Value: ' + dataSend + hexString);
+    let decValue = [];
+
+    while (hexString.length !== 0) {
+      decValue.push(parseInt(hexString.slice(0,2),16));
+      console.log('-----' + decValue);
+      hexString = hexString.slice(2);
+      console.log('This is Hex: ',hexString);
+     }
+    console.log('This is the Decimal: ' + decValue);
       setTimeout(() => {
-      BleManager.write(data.peripheral, service, rwn_characteristic, [166, 2, 208, 1]).then(() => {
+      BleManager.write(dataSend.id, service, rwn_characteristic, decValue ).then(() => {
         console.log('Writed Communication');
       },300);
       });
-    }
-    else if (strs.startsWith('a5') && strs.endsWith('da')) {
-      setTimeout(() => {
-      BleManager.write(data.peripheral, service, rwn_characteristic, [166, 2, 211, 1]).then(() => {
-      });
-        },300);
-    }
   }
 
   renderItem(item) {
@@ -322,6 +328,13 @@ export default class Bluetooth extends Component {
       </TouchableHighlight>
     );
   }
+
+ handleData = (text) => {
+    this.setState({ bleData: text });
+ }
+ login = (dataToSend) => {
+    this.writeToApp(dataToSend);
+ }
 
   render() {
     const list = Array.from(this.state.peripherals.values());
@@ -351,11 +364,22 @@ export default class Bluetooth extends Component {
     );
   } else {
     return (
-    <View style={styles.container}>
-      <TouchableHighlight style={{marginTop: 0,margin: 20, padding:20, backgroundColor:'#ccc'}} onPress={() => this.retrieveConnected() }>
-          <Text>Retrieve connected peripherals</Text>
-      </TouchableHighlight>
-    </View>
+    <View style={styles.container2}>
+  <Text>Scan Bluetooth: {this.state.receivedData}</Text>
+      <TextInput style = {styles.input}
+               underlineColorAndroid = "transparent"
+               placeholder = "Data to Send ex.a60501"
+               placeholderTextColor = "#9a73ef"
+               autoCapitalize = "none"
+               onChangeText = {this.handleData}/>
+      <TouchableOpacity
+               style = {styles.submitButton}
+               onPress = {
+                  () => this.login(this.state.bleData)
+               }>
+          <Text style = {styles.submitButtonText}> Send </Text>
+      </TouchableOpacity>
+         </View>
     );
   }
   }
@@ -376,4 +400,22 @@ const styles = StyleSheet.create({
   row: {
     margin: 10,
   },
+  container2: {
+    paddingTop: 23,
+ },
+ input: {
+    margin: 15,
+    height: 40,
+    borderColor: '#7a42f4',
+    borderWidth: 1,
+ },
+ submitButton: {
+    backgroundColor: '#7a42f4',
+    padding: 10,
+    margin: 15,
+    height: 40,
+ },
+ submitButtonText:{
+    color: 'white',
+ },
 });
