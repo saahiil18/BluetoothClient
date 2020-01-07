@@ -17,10 +17,13 @@ import {
   FlatList,
   TextInput,
   TouchableOpacity,
+  BackHandler,
+  ActivityIndicator,
+  Button,
 } from 'react-native';
 import BleManager from 'react-native-ble-manager';
 import { ScrollView } from 'react-native-gesture-handler';
-import { Colors } from 'react-native/Libraries/NewAppScreen';
+import { scale } from './utils/scaling';
 
 
 const BleManagerModule = NativeModules.BleManager;
@@ -28,6 +31,8 @@ const bleManagerEmitter = new NativeEventEmitter(BleManagerModule);
 const service = '49535343-fe7d-4ae5-8fa9-9fafd205e455';
 const rwn_characteristic = '49535343-1e4d-4bd9-ba61-23c647249616';
 let dataSend = '';
+const request = 'Request';
+const response = 'Response';
 export default class Bluetooth extends Component {
   constructor() {
     super();
@@ -41,6 +46,7 @@ export default class Bluetooth extends Component {
       bleData: '',
       receivedData: '',
       dataOnScreen: [],
+      reqResp: 'Request',
     };
 
     this.handleDiscoverPeripheral = this.handleDiscoverPeripheral.bind(this);
@@ -56,7 +62,6 @@ export default class Bluetooth extends Component {
 
   componentDidMount() {
     AppState.addEventListener('change', this.handleAppStateChange);
-
     BleManager.start({showAlert: false});
 
     this.handlerDiscover = bleManagerEmitter.addListener(
@@ -176,7 +181,7 @@ export default class Bluetooth extends Component {
     if (!this.state.scanning) {
       //this.setState({peripherals: new Map()});
 
-      BleManager.scan([], 6, true).then(() => {
+      BleManager.scan([], 3, true).then(() => {
         console.log('Scanning...');
         this.setState({scanning: true});
       });
@@ -263,6 +268,7 @@ export default class Bluetooth extends Component {
         );
         BleManager.disconnect(peripheral.id, false);
       } else {
+        this.setState({scanning: true});
         BleManager.connect(peripheral.id)
           .then(() => {
             let peripherals = this.state.peripherals;
@@ -270,10 +276,9 @@ export default class Bluetooth extends Component {
             if (p) {
               p.connected = true;
               peripherals.set(peripheral.id, p);
-              this.setState({peripherals});
+              this.setState({peripherals, scanning: false});
             }
             console.log('Connected to ' + peripheral.id);
-
             setTimeout(() => {
               BleManager.retrieveServices(peripheral.id).then(
                 peripheralInfo => {
@@ -297,15 +302,22 @@ export default class Bluetooth extends Component {
             }, 900);
           })
           .catch(error => {
+            this.setState({scanning: false});
             console.log('Connection error', error);
           });
       }
     }
   }
 
+
   writeToApp(hexString) {
     console.log('This is the Value: ' + dataSend + hexString);
     let decValue = [];
+    if (this.state.reqResp === request){
+      hexString = 'A5' + hexString;
+    } else {
+      hexString = 'A6' + hexString;
+    }
 
     while (hexString.length !== 0) {
       decValue.push(parseInt(hexString.slice(0,2),16));
@@ -324,7 +336,7 @@ export default class Bluetooth extends Component {
   renderItem(item) {
     const color = item.connected ? 'green' : '#fff';
     return (
-      <TouchableHighlight onPress={() => this.test(item) }>
+      <TouchableHighlight onPress={() => this.test(item)  }>
         <View style={[styles.row, {backgroundColor: color}]}>
           <Text style={{fontSize: 12, textAlign: 'center', color: '#333333', padding: 10}}>{item.name}</Text>
           <Text style={{fontSize: 10, textAlign: 'center', color: '#333333', padding: 2}}>RSSI: {item.rssi}</Text>
@@ -339,12 +351,26 @@ export default class Bluetooth extends Component {
  }
  login = (dataToSend) => {
     this.writeToApp(dataToSend);
- }
+  }
+
+  updateButton = () => {
+    if (this.state.reqResp === request) {
+    this.setState({reqResp: response});
+    } else {
+      this.setState({reqResp: request});
+    }
+  }
 
   render() {
     const list = Array.from(this.state.peripherals.values());
     let mac_address = dataSend.id;
-    if (!this.state.isConnected) {
+    if (this.state.scanning){
+      return (
+        <View style={[styles.containerAcvt, styles.horizontal]}>
+          <ActivityIndicator size="large" color="#0000ff"/>
+        </View>
+      );
+    } else if (!this.state.isConnected) {
     return (
       <View style={styles.container}>
         <TouchableHighlight style={{marginTop: 40,margin: 20, padding:20, backgroundColor:'#ccc'}} onPress={() => this.startScan() }>
@@ -371,28 +397,32 @@ export default class Bluetooth extends Component {
   } else {
     return (
     <View style={styles.container}>
-      <ScrollView style={styles.scroll}>
-        <View style={{flex: 1}}>
-        <Text style={{textAlign: 'center'}}>Connected to {mac_address}</Text>
-        <Text style={{textAlign: 'center'}}>{this.state.dataOnScreen}</Text>
-          </View>
+      <View style={styles.container2}>
+        <ScrollView style={styles.scroll}>
+          <Text style={{textAlign: 'center'}}>Connected to {mac_address}</Text>
+          <Text style={{textAlign: 'center'}}>{this.state.dataOnScreen}</Text>
         </ScrollView>
-      <View style={styles.inputHandler}>
-        <TextInput style = {styles.input}
+        </View>
+        <View style={styles.buttonContainer}>
+          <View style={{ flex: 1, width: 20, height: 20}}>
+          <Button style={styles.button} onPress={this.updateButton} title={this.state.reqResp} />
+          </View>
+          <TextInput style = {styles.button}
                underlineColorAndroid = "transparent"
                placeholder = "Data to Send ex.a60501"
                placeholderTextColor = "#9a73ef"
                autoCapitalize = "characters"
+               backgroundColor = "#a9a9a9"
                onChangeText = {this.handleData}/>
-        <TouchableOpacity
+               <View style={{ flex: 1, width: 20, height: 20}}>
+          <Button
                style = {styles.submitButton}
                onPress = {
                   () => this.login(this.state.bleData)
-               }>
-          <Text style = {styles.submitButtonText}> Send </Text>
-        </TouchableOpacity>
+               } title="Send"  />
+               </View>
+        </View>
       </View>
-    </View>
     );
   }
   }
@@ -405,37 +435,61 @@ const styles = StyleSheet.create({
     width: window.width,
     height: window.height,
   },
+  container2: {
+    backgroundColor: '#7a42f4',
+    width: '100%',
+    height: 590,
+  },
   scroll: {
     flex: 1,
     backgroundColor: '#f0f0f0',
-    margin: 10,
-    marginBottom: 30,
+    margin: scale(10),
+    marginBottom: scale(30),
   },
   row: {
-    margin: 10,
+    margin: scale(10),
   },
   inputHandler: {
-    paddingTop: 23,
+    paddingTop: scale(23),
     flex: 1,
     position: 'absolute',
     bottom: 0,
  },
  input: {
-    margin: 15,
+    marginTop: 40,
+    marginLeft: 18,
     height: 40,
     width: 200,
     borderColor: '#7a42f4',
-    borderWidth: 1,
+    borderWidth: scale(1),
  },
  submitButton: {
     backgroundColor: '#7a42f4',
-    padding: 10,
-    margin: 15,
-    height: 40,
-    width: 200,
+    padding: scale(10),
+    margin: scale(15),
+    height: scale(40),
+    width: scale(200),
 
  },
  submitButtonText:{
     color: 'white',
  },
+ containerAcvt: {
+  flex: 1,
+  justifyContent: 'center',
+},
+horizontal: {
+  flexDirection: 'row',
+  justifyContent: 'space-around',
+  padding: 10,
+},
+buttonContainer: {
+  flex: 1,
+  flexDirection: 'row',
+},
+button: {
+  color: '#7a42f4',
+  width: '40%',
+  height: 40,
+},
 });
