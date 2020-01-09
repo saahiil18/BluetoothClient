@@ -1,3 +1,4 @@
+/* eslint-disable no-return-assign */
 /* eslint-disable no-fallthrough */
 /* eslint-disable react-native/no-inline-styles */
 /* eslint-disable no-control-regex */
@@ -17,10 +18,10 @@ import {
   FlatList,
   TextInput,
   TouchableOpacity,
-  BackHandler,
   ActivityIndicator,
-  Button,
+  Image,
   KeyboardAvoidingView,
+  Alert,
 } from 'react-native';
 import BleManager from 'react-native-ble-manager';
 import { ScrollView } from 'react-native-gesture-handler';
@@ -31,9 +32,9 @@ const BleManagerModule = NativeModules.BleManager;
 const bleManagerEmitter = new NativeEventEmitter(BleManagerModule);
 const service = '49535343-fe7d-4ae5-8fa9-9fafd205e455';
 const rwn_characteristic = '49535343-1e4d-4bd9-ba61-23c647249616';
-let dataSend = '';
-const request = 'Request';
-const response = 'Response';
+let peripheralObject = '';
+const request = 'Req';
+const response = 'Res';
 export default class Bluetooth extends Component {
   constructor() {
     super();
@@ -47,9 +48,8 @@ export default class Bluetooth extends Component {
       bleData: '',
       receivedData: '',
       dataOnScreen: [],
-      reqResp: 'Request',
+      reqResp: 'Req',
     };
-
     this.handleDiscoverPeripheral = this.handleDiscoverPeripheral.bind(this);
     this.handleStopScan = this.handleStopScan.bind(this);
     this.handleUpdateValueForCharacteristic = this.handleUpdateValueForCharacteristic.bind(
@@ -124,6 +124,7 @@ export default class Bluetooth extends Component {
     this.handlerUpdate.remove();
   }
 
+
   handleDisconnectedPeripheral(data) {
     let peripherals = this.state.peripherals;
     let peripheral = peripherals.get(data.peripheral);
@@ -158,12 +159,14 @@ export default class Bluetooth extends Component {
 
   handleUpdateValueForCharacteristic(data) {
     console.log('Received data from ' + data.peripheral + ' characteristic ' + data.characteristic, data.value);
-    if (data.value) {
+    if (data.value !== null) {
     this.hexdump(data.value, 16);
     var strValue  = (this.HexString(data.value));
     console.log('This is the Value: ' + strValue);
     this.setState({receivedData: strValue});
     return strValue;
+    } else {
+      Alert.alert('Invalid Request or Response');
     }
 }
 
@@ -196,7 +199,7 @@ export default class Bluetooth extends Component {
       }
       console.log(results);
       var peripherals = this.state.peripherals;
-      for (var i = 0; i < results.length; i++) {
+      for (var i = 0; i < results.length; i += 1) {
         var peripheral = results[i];
         peripheral.connected = true;
         peripherals.set(peripheral.id, peripheral);
@@ -259,7 +262,7 @@ export default class Bluetooth extends Component {
   }
 
   test(peripheral) {
-    dataSend = peripheral;
+    peripheralObject = peripheral;
     if (peripheral) {
       if (peripheral.connected) {
         BleManager.stopNotification(
@@ -267,7 +270,7 @@ export default class Bluetooth extends Component {
           service,
           rwn_characteristic,
         );
-        BleManager.disconnect(peripheral.id, false);
+        BleManager.disconnect(peripheral.id);
       } else {
         this.setState({scanning: true});
         BleManager.connect(peripheral.id)
@@ -278,6 +281,8 @@ export default class Bluetooth extends Component {
               p.connected = true;
               peripherals.set(peripheral.id, p);
               this.setState({peripherals, scanning: false});
+              this.setState({isConnected: true});
+
             }
             console.log('Connected to ' + peripheral.id);
             setTimeout(() => {
@@ -292,7 +297,6 @@ export default class Bluetooth extends Component {
                     )
                       .then(() => {
                         console.log('Started notification on ' + peripheral.id);
-                        this.setState({isConnected: true});
                       })
                       .catch(error => {
                         console.log('Notification error', error);
@@ -312,7 +316,7 @@ export default class Bluetooth extends Component {
 
 
   writeToApp(hexString) {
-    console.log('This is the Value: ' + dataSend + hexString);
+    console.log('This is the Value: ' + peripheralObject + hexString);
     let decValue = [];
     if (this.state.reqResp === request){
       hexString = 'A5' + hexString;
@@ -328,7 +332,7 @@ export default class Bluetooth extends Component {
      }
     console.log('This is the Decimal: ' + decValue);
       setTimeout(() => {
-      BleManager.write(dataSend.id, service, rwn_characteristic, decValue ).then(() => {
+      BleManager.write(peripheralObject.id, service, rwn_characteristic, decValue ).then(() => {
         console.log('Writed Communication');
       },300);
       });
@@ -341,7 +345,7 @@ export default class Bluetooth extends Component {
         <View style={[styles.row, {backgroundColor: color}]}>
           <Text style={{fontSize: 12, textAlign: 'center', color: '#333333', padding: 10}}>{item.name}</Text>
           <Text style={{fontSize: 10, textAlign: 'center', color: '#333333', padding: 2}}>RSSI: {item.rssi}</Text>
-          <Text style={{fontSize: 8, textAlign: 'center', color: '#333333', padding: 2, paddingBottom: 20}}>{item.id}</Text>
+          <Text style={{fontSize: 18, textAlign: 'center', color: '#333333', padding: 2, paddingBottom: 20}}>{item.id}</Text>
         </View>
       </TouchableHighlight>
     );
@@ -351,7 +355,15 @@ export default class Bluetooth extends Component {
     this.setState({ bleData: text });
  }
  login = (dataToSend) => {
+  if (dataToSend.includes('D0') || dataToSend.includes('D1') || dataToSend.includes('D2') || dataToSend.includes('D3') || dataToSend.includes('D4') || dataToSend.includes('D5') || dataToSend.includes('D6') || dataToSend.includes('D7') || dataToSend.includes('D8') || dataToSend.includes('D9') || dataToSend.includes('DA')){
+   let logs = [];
+   logs.push(this.state.dataOnScreen);
     this.writeToApp(dataToSend);
+    logs.push(dataToSend);
+    this.setState({dataOnScreen: logs + '\n'});
+  } else {
+    Alert.alert('Didnt Match Any Function Codes');
+  }
   }
 
   updateButton = () => {
@@ -362,9 +374,10 @@ export default class Bluetooth extends Component {
     }
   }
 
+
   render() {
     const list = Array.from(this.state.peripherals.values());
-    let mac_address = dataSend.id;
+    let mac_address = peripheralObject.id;
     if (this.state.scanning){
       return (
         <View style={[styles.containerAcvt, styles.horizontal]}>
@@ -399,34 +412,43 @@ export default class Bluetooth extends Component {
     return (
     <View style={styles.container}>
       <View style={styles.container2}>
-        <ScrollView style={styles.scroll}>
+        <ScrollView style={styles.scroll} ref={ref => this.scrollView = ref}
+    onContentSizeChange={(contentWidth, contentHeight)=>{
+        this.scrollView.scrollToEnd({animated: true});
+    }}>
           <Text style={{textAlign: 'center'}}>Connected to {mac_address}</Text>
-          <Text style={{textAlign: 'center'}}>{this.state.dataOnScreen}</Text>
+          {console.log('I am Length: ' + this.state.dataOnScreen.length)}
+          <Text style={{textAlign: 'center', color: '#ff0000'}}>{this.state.dataOnScreen}</Text>
         </ScrollView>
       </View>
-        <KeyboardAvoidingView style={{ flexDirection: 'column', justifyContent: 'flex-end' }} behavior="position" enabled keyboardVerticalOffset={100}>
+        {/* <KeyboardAvoidingView style={{ flexDirection: 'column'}} behavior="position" enabled keyboardVerticalOffset={100}> */}
         <ScrollView >
           <View style={styles.buttonContainer}>
-            <View style={{ flex: 1, width: 20, height: 20}}>
-              <Button style={styles.button} onPress={this.updateButton} title={this.state.reqResp} />
+            <View style={{ flex: 1, width: 5, height: 5}}>
+              <TouchableOpacity onPress={this.updateButton}>
+                <Text style={{ fontSize: 18}}>{this.state.reqResp}</Text>
+              </TouchableOpacity>
             </View>
             <TextInput style = {styles.button}
                underlineColorAndroid = "transparent"
-               placeholder = "Data to Send ex.a60501"
+               placeholder = "Length FunctionCode RemainingBytes"
                placeholderTextColor = "#9a73ef"
                autoCapitalize = "characters"
                backgroundColor = "#a9a9a9"
                onChangeText = {this.handleData}/>
               <View style={{ flex: 1, width: 20, height: 20}}>
-                <Button
-                  style = {styles.submitButton}
+                <TouchableOpacity
                   onPress = {
                   () => this.login(this.state.bleData)
-                  } title="Send"  />
+                  }><Image
+                  style={{width: scale(15), height: scale(15), margin: scale(5)}}
+                  source={require('../assets/send.png')}
+                />
+                </TouchableOpacity>
                </View>
               </View>
               </ScrollView>
-            </KeyboardAvoidingView>
+            {/* </KeyboardAvoidingView>*/}
           </View>
     );
   }
@@ -441,15 +463,14 @@ const styles = StyleSheet.create({
     height: window.height,
   },
   container2: {
-    backgroundColor: '#7a42f4',
     width: '100%',
-    height: 590,
+    height: 683,
   },
   scroll: {
     flex: 1,
     backgroundColor: '#f0f0f0',
     margin: scale(10),
-    marginBottom: scale(30),
+    marginBottom: scale(10),
   },
   row: {
     margin: scale(10),
@@ -491,10 +512,11 @@ horizontal: {
 buttonContainer: {
   flex: 1,
   flexDirection: 'row',
+  backgroundColor: '#00ff00',
 },
 button: {
   color: '#7a42f4',
-  width: '40%',
+  width: '80%',
   height: 40,
 },
 });

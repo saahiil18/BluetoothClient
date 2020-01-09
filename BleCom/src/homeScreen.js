@@ -2,14 +2,6 @@ import React from 'react';
 import {StyleSheet, View, ImageBackground, Alert, Button} from 'react-native';
 
 export default class HomeScreen extends React.Component {
-  signupPressed = () => {
-    Alert.alert('Completed Sign Up');
-  };
-
-  loginPressed = () => {
-    Alert.alert('Completed Login!');
-  };
-
   static navigationOptions = {
     title: 'HomeScreen',
   };
