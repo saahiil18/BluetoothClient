@@ -20,6 +20,7 @@ import {
   BackHandler,
   ActivityIndicator,
   Button,
+  KeyboardAvoidingView,
 } from 'react-native';
 import BleManager from 'react-native-ble-manager';
 import { ScrollView } from 'react-native-gesture-handler';
@@ -181,7 +182,7 @@ export default class Bluetooth extends Component {
     if (!this.state.scanning) {
       //this.setState({peripherals: new Map()});
 
-      BleManager.scan([], 3, true).then(() => {
+      BleManager.scan([], 6, true).then(() => {
         console.log('Scanning...');
         this.setState({scanning: true});
       });
@@ -402,27 +403,31 @@ export default class Bluetooth extends Component {
           <Text style={{textAlign: 'center'}}>Connected to {mac_address}</Text>
           <Text style={{textAlign: 'center'}}>{this.state.dataOnScreen}</Text>
         </ScrollView>
-        </View>
-        <View style={styles.buttonContainer}>
-          <View style={{ flex: 1, width: 20, height: 20}}>
-          <Button style={styles.button} onPress={this.updateButton} title={this.state.reqResp} />
-          </View>
-          <TextInput style = {styles.button}
+      </View>
+        <KeyboardAvoidingView style={{ flexDirection: 'column', justifyContent: 'flex-end' }} behavior="position" enabled keyboardVerticalOffset={100}>
+        <ScrollView >
+          <View style={styles.buttonContainer}>
+            <View style={{ flex: 1, width: 20, height: 20}}>
+              <Button style={styles.button} onPress={this.updateButton} title={this.state.reqResp} />
+            </View>
+            <TextInput style = {styles.button}
                underlineColorAndroid = "transparent"
                placeholder = "Data to Send ex.a60501"
                placeholderTextColor = "#9a73ef"
                autoCapitalize = "characters"
                backgroundColor = "#a9a9a9"
                onChangeText = {this.handleData}/>
-               <View style={{ flex: 1, width: 20, height: 20}}>
-          <Button
-               style = {styles.submitButton}
-               onPress = {
+              <View style={{ flex: 1, width: 20, height: 20}}>
+                <Button
+                  style = {styles.submitButton}
+                  onPress = {
                   () => this.login(this.state.bleData)
-               } title="Send"  />
+                  } title="Send"  />
                </View>
-        </View>
-      </View>
+              </View>
+              </ScrollView>
+            </KeyboardAvoidingView>
+          </View>
     );
   }
   }
