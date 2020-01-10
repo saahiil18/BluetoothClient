@@ -318,6 +318,7 @@ export default class Bluetooth extends Component {
   writeToApp(hexString) {
     console.log('This is the Value: ' + peripheralObject + hexString);
     let decValue = [];
+
     if (this.state.reqResp === request){
       hexString = 'A5' + hexString;
     } else {
@@ -330,7 +331,15 @@ export default class Bluetooth extends Component {
       hexString = hexString.slice(2);
       console.log('This is Hex: ',hexString);
      }
-    console.log('This is the Decimal: ' + decValue);
+    console.log('This is the Decimal: ' + decValue.length);
+    let f1 = decValue[0];
+    let f2 = decValue[1];
+    let result = f1 ^ f2;
+    for (let i = 2; i <= decValue.length; i++) {
+      result  = result ^ decValue[i];
+      console.log('This is XOR: ' + result);
+    }
+    decValue.push(result);
       setTimeout(() => {
       BleManager.write(peripheralObject.id, service, rwn_characteristic, decValue ).then(() => {
         console.log('Writed Communication');
@@ -343,9 +352,9 @@ export default class Bluetooth extends Component {
     return (
       <TouchableHighlight onPress={() => this.test(item)  }>
         <View style={[styles.row, {backgroundColor: color}]}>
-          <Text style={{fontSize: 12, textAlign: 'center', color: '#333333', padding: 10}}>{item.name}</Text>
+          <Text style={{fontSize: 18, textAlign: 'center', color: '#333333', padding: 10}}>{item.name}</Text>
           <Text style={{fontSize: 10, textAlign: 'center', color: '#333333', padding: 2}}>RSSI: {item.rssi}</Text>
-          <Text style={{fontSize: 18, textAlign: 'center', color: '#333333', padding: 2, paddingBottom: 20}}>{item.id}</Text>
+          <Text style={{fontSize: 14, textAlign: 'center', color: '#333333', padding: 2, paddingBottom: 20}}>{item.id}</Text>
         </View>
       </TouchableHighlight>
     );
@@ -355,15 +364,13 @@ export default class Bluetooth extends Component {
     this.setState({ bleData: text });
  }
  login = (dataToSend) => {
-  if (dataToSend.includes('D0') || dataToSend.includes('D1') || dataToSend.includes('D2') || dataToSend.includes('D3') || dataToSend.includes('D4') || dataToSend.includes('D5') || dataToSend.includes('D6') || dataToSend.includes('D7') || dataToSend.includes('D8') || dataToSend.includes('D9') || dataToSend.includes('DA')){
-   let logs = [];
+  // const funcCodes = ['D0','D1','D2','D3','D4','D5','D6','D7','D8','D9','DA'];
+  let logs = [];
    logs.push(this.state.dataOnScreen);
     this.writeToApp(dataToSend);
     logs.push(dataToSend);
-    this.setState({dataOnScreen: logs + '\n'});
-  } else {
-    Alert.alert('Didnt Match Any Function Codes');
-  }
+    console.log('Data on Screen: ' + this.state.dataOnScreen);
+    this.setState({dataOnScreen:logs + '\n'});
   }
 
   updateButton = () => {
@@ -413,22 +420,22 @@ export default class Bluetooth extends Component {
     <View style={styles.container}>
       <View style={styles.container2}>
         <ScrollView style={styles.scroll} ref={ref => this.scrollView = ref}
-    onContentSizeChange={(contentWidth, contentHeight)=>{
+        onContentSizeChange={(contentWidth, contentHeight)=>{
         this.scrollView.scrollToEnd({animated: true});
-    }}>
-          <Text style={{textAlign: 'center'}}>Connected to {mac_address}</Text>
+        }}>
+        <Text style={{textAlign: 'center'}}>Connected to {mac_address}</Text>
           {console.log('I am Length: ' + this.state.dataOnScreen.length)}
-          <Text style={{textAlign: 'center', color: '#ff0000'}}>{this.state.dataOnScreen}</Text>
+          <Text style={{color: '#ff0000', fontSize: 18}}>{this.state.dataOnScreen}</Text>
         </ScrollView>
       </View>
-        {/* <KeyboardAvoidingView style={{ flexDirection: 'column'}} behavior="position" enabled keyboardVerticalOffset={100}> */}
-        <ScrollView >
-          <View style={styles.buttonContainer}>
-            <View style={{ flex: 1, width: 5, height: 5}}>
-              <TouchableOpacity onPress={this.updateButton}>
-                <Text style={{ fontSize: 18}}>{this.state.reqResp}</Text>
-              </TouchableOpacity>
-            </View>
+      <KeyboardAvoidingView style={{ flexDirection: 'column', justifyContent: 'flex-end'}} behavior="position" enabled keyboardVerticalOffset={100}>
+          <ScrollView>
+            <View style={styles.buttonContainer}>
+              <View style={{ flex: 1, width: 5, height: 5}}>
+                <TouchableOpacity onPress={this.updateButton}>
+                  <Text style={{ fontSize: 18}}>{this.state.reqResp}</Text>
+                </TouchableOpacity>
+              </View>
             <TextInput style = {styles.button}
                underlineColorAndroid = "transparent"
                placeholder = "Length FunctionCode RemainingBytes"
@@ -436,20 +443,22 @@ export default class Bluetooth extends Component {
                autoCapitalize = "characters"
                backgroundColor = "#a9a9a9"
                onChangeText = {this.handleData}/>
-              <View style={{ flex: 1, width: 20, height: 20}}>
-                <TouchableOpacity
-                  onPress = {
-                  () => this.login(this.state.bleData)
-                  }><Image
-                  style={{width: scale(15), height: scale(15), margin: scale(5)}}
-                  source={require('../assets/send.png')}
-                />
-                </TouchableOpacity>
-               </View>
-              </View>
-              </ScrollView>
-            {/* </KeyboardAvoidingView>*/}
-          </View>
+                <View style={{ flex: 1, width: 20, height: 20}}>
+                  <TouchableOpacity
+                    onPress = {
+                    () => this.login(this.state.bleData)
+                    }>
+                    <Image
+                    style={{width: scale(15), height: scale(15), margin: scale(5)}}
+                    source={require('../assets/send.png')}
+                    />
+                    </TouchableOpacity>
+                    </View>
+                  </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </View>
+
     );
   }
   }
@@ -464,7 +473,7 @@ const styles = StyleSheet.create({
   },
   container2: {
     width: '100%',
-    height: 683,
+    height: 660,
   },
   scroll: {
     flex: 1,
